@@ -1,11 +1,14 @@
-package geojson
+package main
 
 import (
 	"encoding/json"
+	"flag"
+	"fmt"
 	"io"
+	"os"
+	"strings"
 )
 
-// coordinates as linestring
 type LGeoJSON struct {
 	Type     string      `json:"type"`
 	Features []LFeatures `json:"features"`
@@ -111,4 +114,66 @@ func MultiCoordinates(data MGeoJSON) ([]float64, []float64) {
 		}
 	}
 	return xp, yp
+}
+
+func coorderr(s string, err error) {
+	if len(s) > 0 {
+		fmt.Fprintf(os.Stderr, "coordinates encoded as %q (use -type %s)\n", s, strings.ToLower(s[0:1]))
+	}
+	fmt.Fprintln(os.Stderr, err)
+}
+
+func coords(w io.Writer, r io.Reader, ptype string) {
+	var x, y []float64
+	switch ptype {
+	case "linestring", "l", "ls":
+		data, err := LineParse(r)
+		if err != nil {
+			coorderr(data.Features[0].Geometry.Type, err)
+			return
+		}
+		x, y = LineCoordinates(data)
+
+	case "polygon", "p", "poly":
+		data, err := Parse(r)
+		if err != nil {
+			coorderr(data.Features[0].Geometry.Type, err)
+			return
+		}
+		x, y = Coordinates(data)
+
+	case "multipolygon", "m", "mp":
+		data, err := MultiParse(r)
+		if err != nil {
+			coorderr(data.Features[0].Geometry.Type, err)
+			return
+		}
+		x, y = MultiCoordinates(data)
+	}
+
+	for i := 0; i < len(x); i++ {
+		fmt.Fprintf(w, "%v %v\n", x[i], y[i])
+	}
+}
+
+func main() {
+
+	var ptype string
+	flag.StringVar(&ptype, "type", "polygon", "type of coordinate ([l]linestring, [p]olygon, [m]ultipolygon)")
+	flag.Parse()
+
+	if len(flag.Args()) == 0 {
+		coords(os.Stdout, os.Stdin, ptype)
+		return
+	}
+
+	for _, filename := range flag.Args() {
+		r, err := os.Open(filename)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			continue
+		}
+		coords(os.Stdout, r, ptype)
+		r.Close()
+	}
 }
