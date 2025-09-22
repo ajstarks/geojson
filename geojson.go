@@ -56,24 +56,28 @@ type MGeometry struct {
 	Coordinates [][][][]float64 `json:"coordinates"`
 }
 
-func LineParse(r io.Reader) (LGeoJSON, error) {
-	var data LGeoJSON
-	err := json.NewDecoder(r).Decode(&data)
-	return data, err
-}
-
+// Parse parses GeoJSON geometry
 func Parse(r io.Reader) (GeoJSON, error) {
 	var data GeoJSON
 	err := json.NewDecoder(r).Decode(&data)
 	return data, err
 }
 
+// LineParse parses GeoJSON lines
+func LineParse(r io.Reader) (LGeoJSON, error) {
+	var data LGeoJSON
+	err := json.NewDecoder(r).Decode(&data)
+	return data, err
+}
+
+// MultiParse parses muliple GeoJSON structure
 func MultiParse(r io.Reader) (MGeoJSON, error) {
 	var data MGeoJSON
 	err := json.NewDecoder(r).Decode(&data)
 	return data, err
 }
 
+// LineCoordinates returns a set of line lat/long coordinates
 func LineCoordinates(data LGeoJSON) ([]float64, []float64) {
 	var xp, yp []float64
 	for _, f := range data.Features {
@@ -88,6 +92,7 @@ func LineCoordinates(data LGeoJSON) ([]float64, []float64) {
 	return xp, yp
 }
 
+// Coordinates returns polygon lat long coordinates
 func Coordinates(data GeoJSON) ([]float64, []float64) {
 	var xp, yp []float64
 	for _, f := range data.Features {
@@ -102,6 +107,7 @@ func Coordinates(data GeoJSON) ([]float64, []float64) {
 	return xp, yp
 }
 
+// MultiCoordinates returns multipolygon lat/long coordinates
 func MultiCoordinates(data MGeoJSON) ([]float64, []float64) {
 	var xp, yp []float64
 	for _, f := range data.Features {
@@ -116,13 +122,16 @@ func MultiCoordinates(data MGeoJSON) ([]float64, []float64) {
 	return xp, yp
 }
 
+// corderr processes coordinate errors
 func coorderr(s string, err error) {
 	if len(s) > 0 {
-		fmt.Fprintf(os.Stderr, "coordinates encoded as %q (use -type %s)\n", s, strings.ToLower(s[0:1]))
+		fmt.Fprintf(os.Stderr,
+			"coordinates encoded as %q (use -type %s)\n", s, strings.ToLower(s[0:1]))
 	}
 	fmt.Fprintln(os.Stderr, err)
 }
 
+// coords writes lat/long coordinates to an io.Writer read from an io.Reader
 func coords(w io.Writer, r io.Reader, ptype string) {
 	var x, y []float64
 	switch ptype {
@@ -162,11 +171,13 @@ func main() {
 	flag.StringVar(&ptype, "type", "polygon", "type of coordinate ([l]linestring, [p]olygon, [m]ultipolygon)")
 	flag.Parse()
 
+	// if no args read/write from stdin/stdout
 	if len(flag.Args()) == 0 {
 		coords(os.Stdout, os.Stdin, ptype)
 		return
 	}
 
+	// for every file read and write coordinates
 	for _, filename := range flag.Args() {
 		r, err := os.Open(filename)
 		if err != nil {
